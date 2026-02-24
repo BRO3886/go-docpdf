@@ -11,6 +11,7 @@ import (
 	"os"
 
 	"github.com/BRO3886/go-docpdf/internal/converter"
+	"github.com/BRO3886/go-docpdf/internal/middleware"
 )
 
 const maxFileSize = 10 << 20 // 10 MB
@@ -33,6 +34,8 @@ func NewConvert(conv converter.Converter) *Convert {
 // ServeHTTP implements http.Handler.
 func (h *Convert) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
+		middleware.SetOutcome(r.Context(), "failed")
+		middleware.SetLogError(r.Context(), "method not allowed")
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
@@ -41,12 +44,16 @@ func (h *Convert) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxFileSize+4096)
 
 	if err := r.ParseMultipartForm(maxFileSize); err != nil {
+		middleware.SetOutcome(r.Context(), "failed")
+		middleware.SetLogError(r.Context(), "file too large")
 		writeError(w, http.StatusRequestEntityTooLarge, "file too large")
 		return
 	}
 
 	f, _, err := r.FormFile("file")
 	if err != nil {
+		middleware.SetOutcome(r.Context(), "failed")
+		middleware.SetLogError(r.Context(), "missing file field")
 		writeError(w, http.StatusBadRequest, "missing file field")
 		return
 	}
@@ -56,21 +63,29 @@ func (h *Convert) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	lr := &io.LimitedReader{R: f, N: maxFileSize + 1}
 	data, err := io.ReadAll(lr)
 	if err != nil {
+		middleware.SetOutcome(r.Context(), "failed")
+		middleware.SetLogError(r.Context(), "could not read file")
 		writeError(w, http.StatusInternalServerError, "could not read file")
 		return
 	}
 	if int64(len(data)) > maxFileSize {
+		middleware.SetOutcome(r.Context(), "failed")
+		middleware.SetLogError(r.Context(), "file too large")
 		writeError(w, http.StatusRequestEntityTooLarge, "file too large")
 		return
 	}
 
 	if !hasDocxMagic(data) {
+		middleware.SetOutcome(r.Context(), "failed")
+		middleware.SetLogError(r.Context(), "unsupported file type")
 		writeError(w, http.StatusUnsupportedMediaType, "unsupported file type")
 		return
 	}
 
 	tmpDir, err := os.MkdirTemp("", "docpdf-*")
 	if err != nil {
+		middleware.SetOutcome(r.Context(), "failed")
+		middleware.SetLogError(r.Context(), "internal error: mkdirtemp")
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
@@ -78,6 +93,8 @@ func (h *Convert) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	inputPath := fmt.Sprintf("%s/input.docx", tmpDir)
 	if err := os.WriteFile(inputPath, data, 0600); err != nil {
+		middleware.SetOutcome(r.Context(), "failed")
+		middleware.SetLogError(r.Context(), "internal error: writefile")
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
@@ -87,8 +104,12 @@ func (h *Convert) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if convErr != nil {
 		switch {
 		case errors.Is(convErr, converter.ErrTimeout):
+			middleware.SetOutcome(r.Context(), "timeout")
+			middleware.SetLogError(r.Context(), "conversion timed out")
 			writeError(w, http.StatusGatewayTimeout, "conversion timed out")
 		default:
+			middleware.SetOutcome(r.Context(), "failed")
+			middleware.SetLogError(r.Context(), "conversion failed")
 			writeError(w, http.StatusInternalServerError, "conversion failed")
 		}
 		return
@@ -96,10 +117,13 @@ func (h *Convert) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	pdfData, err := os.ReadFile(pdfPath)
 	if err != nil || len(pdfData) == 0 {
+		middleware.SetOutcome(r.Context(), "failed")
+		middleware.SetLogError(r.Context(), "conversion produced no output")
 		writeError(w, http.StatusInternalServerError, "conversion produced no output")
 		return
 	}
 
+	middleware.SetOutcome(r.Context(), "success")
 	w.Header().Set("Content-Type", "application/pdf")
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(pdfData)))
 	w.WriteHeader(http.StatusOK)

@@ -2,6 +2,8 @@
 
 Lightweight HTTP service that converts `.docx` files to PDF by shelling out to LibreOffice. Zero external Go dependencies — stdlib only.
 
+**Why this exists:** Many applications accept `.docx` uploads, but LLMs like Gemini work best (or exclusively) with PDFs. go-docpdf sits in the middle — POST a `.docx`, get back a PDF ready to pass to your AI pipeline.
+
 ## API
 
 ### `POST /convert`
