@@ -196,6 +196,19 @@ The public API of `Registry` is unchanged — `middleware.go`, `handler.go`, and
 
 ---
 
+## Backwards Compatibility
+
+**This migration does not need to be backwards compatible.** go-docpdf is a Docker image published to GHCR, not a Go library. There are no importers, no public Go API to preserve, and no semver contract on the `/metrics` output format. Concretely:
+
+- The `internal/metrics` package is unexported from the module — no external consumer can import it
+- The `/metrics` HTTP response will change (label format, added `_created` timestamps, potentially protobuf support) — any existing scrape config pointing at the hand-rolled output will need to be updated, but this is a one-line Prometheus config change, not a breaking API change
+- Deployers pulling `:latest` or a new semver tag from GHCR simply get the new image — no migration path needed for the old format
+- The `Registry` public method signatures (`IncSuccess`, `ObserveDuration`, etc.) can be changed freely since they're only called from within this module
+
+This removes the main implementation risk. The migration can be done in a single PR with no compatibility shim, no deprecation period, and no feature flag.
+
+---
+
 ## Recommendation
 
 **Do it** if:
@@ -208,4 +221,4 @@ The public API of `Registry` is unchanged — `middleware.go`, `handler.go`, and
 - The metric set stays fixed at these 3 instruments
 - Scraping is done by a simple tool that only needs text format
 
-The migration is low-risk (public API unchanged, ~100 lines swapped) but the dependency cost is real and should be a deliberate decision rather than a default.
+The migration is low-risk (public API unchanged, ~100 lines swapped, no backwards compatibility requirement) and the dependency cost is real but one-time.
