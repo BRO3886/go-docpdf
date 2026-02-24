@@ -28,12 +28,30 @@ curl -X POST http://localhost:8080/convert \
 
 All errors return JSON: `{"error": "<message>"}`. Internal paths are never exposed.
 
+**Request tracing:** pass an `X-Request-ID` header and it will be echoed on the response and included in every log line. If omitted, one is generated automatically.
+
 ### `GET /health`
 
 ```sh
 curl http://localhost:8080/health
 # {"status":"ok"}
 ```
+
+### `GET /metrics`
+
+Prometheus text format exposition. Exposes conversion counters, in-flight gauge, and a duration histogram.
+
+```sh
+curl http://localhost:8080/metrics
+```
+
+Metrics exposed:
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `docpdf_conversions_total{outcome="success\|timeout\|failed"}` | counter | Conversion outcomes |
+| `docpdf_conversions_in_flight` | gauge | Concurrent conversions in progress |
+| `docpdf_conversion_duration_ms` | histogram | Duration in ms (buckets: 100–30000) |
 
 ## Running
 
@@ -73,6 +91,8 @@ go run ./cmd/server
 cmd/server/          — entry point
 internal/converter/  — Converter interface + LibreOffice implementation
 internal/handler/    — HTTP handlers
+internal/metrics/    — Prometheus-compatible registry (atomic counters + histogram)
+internal/middleware/ — RequestID, Logging, and Metrics middleware
 ```
 
 ## Tests
