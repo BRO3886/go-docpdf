@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -101,5 +103,65 @@ func TestLibreOffice_ConversionFailed(t *testing.T) {
 	_, err := c.Convert(context.Background(), inputPath, tmpDir)
 	if err == nil {
 		t.Fatal("expected error, got nil")
+	}
+}
+
+// TestLibreOffice_ProfileIsolation verifies that each Convert call receives a
+// distinct HOME environment variable, confirming per-request profile isolation.
+func TestLibreOffice_ProfileIsolation(t *testing.T) {
+	// homeLog collects the HOME values seen by each subprocess invocation.
+	var (
+		mu      sync.Mutex
+		homeSeen []string
+	)
+
+	// Run two conversions concurrently. Each uses its own outDir, so HOME
+	// should differ between them.
+	const n = 2
+	var wg sync.WaitGroup
+	errs := make([]error, n)
+
+	for i := range n {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+
+			tmpDir := t.TempDir()
+			inputPath := filepath.Join(tmpDir, "input.docx")
+			_ = os.WriteFile(inputPath, []byte("dummy"), 0600)
+
+			// Fake binary: write $HOME to a known file, then create input.pdf.
+			homeFile := filepath.Join(tmpDir, "home.txt")
+			script := fmt.Sprintf(
+				"#!/bin/sh\nprintf \"%%s\" \"$HOME\" > %s\necho fake > %s/input.pdf\n",
+				homeFile, tmpDir,
+			)
+			scriptPath := filepath.Join(tmpDir, "fake-lo.sh")
+			_ = os.WriteFile(scriptPath, []byte(script), 0755)
+
+			c := &converter.LibreOffice{BinaryPath: scriptPath, Timeout: 5 * time.Second}
+			_, errs[idx] = c.Convert(context.Background(), inputPath, tmpDir)
+
+			data, readErr := os.ReadFile(homeFile)
+			if readErr == nil {
+				mu.Lock()
+				homeSeen = append(homeSeen, strings.TrimSpace(string(data)))
+				mu.Unlock()
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	for i, err := range errs {
+		if err != nil {
+			t.Errorf("conversion %d failed: %v", i, err)
+		}
+	}
+
+	if len(homeSeen) != n {
+		t.Fatalf("expected %d HOME values recorded, got %d", n, len(homeSeen))
+	}
+	if homeSeen[0] == homeSeen[1] {
+		t.Errorf("both conversions shared the same HOME (%q) — isolation not working", homeSeen[0])
 	}
 }

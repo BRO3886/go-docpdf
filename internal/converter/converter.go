@@ -62,6 +62,14 @@ func (lo *LibreOffice) Convert(ctx context.Context, inputPath string, outDir str
 		"--outdir", outDir,
 		inputPath,
 	)
+	// Give each conversion its own HOME so LibreOffice creates a fresh, isolated
+	// user profile inside outDir. This prevents lock-file conflicts and state
+	// bleed between concurrent requests. outDir is already cleaned up by the
+	// caller, so the profile is removed for free.
+	cmd.Env = append(os.Environ(),
+		"HOME="+outDir,
+		"UserInstallation=file://"+outDir+"/lo-profile",
+	)
 
 	if _, err := cmd.CombinedOutput(); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {

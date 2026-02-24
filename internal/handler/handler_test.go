@@ -125,27 +125,12 @@ func TestConvert_TimeoutSimulation(t *testing.T) {
 	assertJSONError(t, rr.Body.String())
 }
 
-func TestConvert_ConcurrentRequestsSerialized(t *testing.T) {
-	var (
-		mu      sync.Mutex
-		active  int
-		overlap bool
-	)
+func TestConvert_ConcurrentRequestsAllSucceed(t *testing.T) {
+	// With per-request profile isolation, concurrent calls are safe.
+	// Verify that N simultaneous requests all complete successfully.
 	mc := &mockConverter{
 		callsFn: func(_ context.Context, _ string, outDir string) (string, error) {
-			mu.Lock()
-			active++
-			if active > 1 {
-				overlap = true
-			}
-			mu.Unlock()
-
-			time.Sleep(30 * time.Millisecond)
-
-			mu.Lock()
-			active--
-			mu.Unlock()
-
+			time.Sleep(10 * time.Millisecond) // simulate work
 			pdfPath := filepath.Join(outDir, "input.pdf")
 			_ = os.WriteFile(pdfPath, []byte("%PDF fake"), 0600)
 			return pdfPath, nil
@@ -167,9 +152,6 @@ func TestConvert_ConcurrentRequestsSerialized(t *testing.T) {
 	}
 	wg.Wait()
 
-	if overlap {
-		t.Fatal("concurrent LibreOffice calls detected — serialization failed")
-	}
 	for i, code := range codes {
 		if code != http.StatusOK {
 			t.Errorf("request %d: expected 200, got %d", i, code)

@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"sync"
 
 	"github.com/BRO3886/go-docpdf/internal/converter"
 )
@@ -24,10 +23,6 @@ var docxMagic = [4]byte{0x50, 0x4B, 0x03, 0x04}
 // and streams back the resulting PDF.
 type Convert struct {
 	conv converter.Converter
-
-	// mu serializes LibreOffice invocations; LibreOffice does not handle
-	// concurrent calls reliably.
-	mu sync.Mutex
 }
 
 // NewConvert returns a Convert handler backed by conv.
@@ -87,9 +82,7 @@ func (h *Convert) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.mu.Lock()
 	pdfPath, convErr := h.conv.Convert(context.Background(), inputPath, tmpDir)
-	h.mu.Unlock()
 
 	if convErr != nil {
 		switch {
