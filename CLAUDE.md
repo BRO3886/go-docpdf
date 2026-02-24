@@ -4,12 +4,13 @@
 Lightweight Go HTTP service: POST a `.docx`, get back a PDF. Shells out to LibreOffice. Designed to replace Gotenberg for a single use-case.
 
 ## Status
-**Complete (session 002, 2026-02-24)** — 15 tests passing, Docker image built and tagged, open-sourced on GitHub
+**Complete (session 003, 2026-02-25)** — 15 tests passing, Docker image pushed to GHCR, repo public on GitHub
 
 - POST /convert — multipart upload → PDF response
 - GET /health — {"status":"ok"}
 - 15 tests, all passing (including `-race`)
-- Docker image: `ghcr.io/bro3886/go-docpdf:latest` and `ghcr.io/bro3886/go-docpdf:<sha>`
+- Docker image pushed: `ghcr.io/bro3886/go-docpdf:latest` + `ghcr.io/bro3886/go-docpdf:bb80ed7` (917MB)
+- GitHub: https://github.com/BRO3886/go-docpdf
 
 ## Package Layout
 ```
