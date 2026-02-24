@@ -1,0 +1,16 @@
+# Build output
+docpdf
+/server
+
+# Test output
+*.pdf
+*.test
+
+# macOS
+.DS_Store
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
