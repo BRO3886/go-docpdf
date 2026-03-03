@@ -1,6 +1,6 @@
 # go-docpdf
 
-Lightweight HTTP service that converts `.docx` files to PDF by shelling out to LibreOffice. Zero external Go dependencies — stdlib only.
+Lightweight HTTP service that converts `.docx` files to PDF by shelling out to LibreOffice.
 
 **Why this exists:** Many applications accept `.docx` uploads, but LLMs like Gemini work best (or exclusively) with PDFs. go-docpdf sits in the middle — POST a `.docx`, get back a PDF ready to pass to your AI pipeline.
 
@@ -91,7 +91,7 @@ go run ./cmd/server
 cmd/server/          — entry point
 internal/converter/  — Converter interface + LibreOffice implementation
 internal/handler/    — HTTP handlers
-internal/metrics/    — Prometheus-compatible registry (atomic counters + histogram)
+internal/metrics/    — Prometheus registry backed by prometheus/client_golang
 internal/middleware/ — RequestID, Logging, and Metrics middleware
 ```
 

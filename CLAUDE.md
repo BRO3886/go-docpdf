@@ -6,7 +6,7 @@ Lightweight Go HTTP service: POST a `.docx`, get back a PDF. Shells out to Libre
 
 ## Status
 
-**Complete (session 004, 2026-02-25)** — 19 tests passing, observability added, Docker image pushed to GHCR, repo public on GitHub
+**Complete (session 005, 2026-03-03)** — 19 tests passing, prometheus/client_golang migration done
 
 - POST /convert — multipart upload → PDF response
 - GET /health — {"status":"ok"}
@@ -23,7 +23,7 @@ internal/converter/converter.go       — Converter interface + LibreOffice impl
 internal/converter/converter_test.go  — 5 tests
 internal/handler/handler.go           — Convert + Health handlers (SetOutcome/SetLogError at each return)
 internal/handler/handler_test.go      — 10 tests
-internal/metrics/metrics.go           — Registry: atomic counters, histogram, Prometheus text renderer
+internal/metrics/metrics.go           — Registry backed by prometheus/client_golang (CounterVec, Gauge, Histogram)
 internal/metrics/metrics_test.go      — 5 tests
 internal/middleware/middleware.go     — RequestID, Logging, Metrics middleware + context helpers
 internal/middleware/middleware_test.go — 9 tests
@@ -54,9 +54,9 @@ docker run -p 8080:8080 ghcr.io/bro3886/go-docpdf:latest
 - Per-request `HOME` + `UserInstallation` env vars isolate each LO subprocess; profile cleanup is free via `defer os.RemoveAll(tmpDir)`
 - Errors: always `{"error": "<safe message>"}` JSON, never expose paths or system details
 - Sentinel errors in `converter` package: `ErrTimeout`, `ErrNoOutput`, `ErrConversionFailed`
-- No external dependencies — stdlib only
-- Docker: `USER 65534:65534` (numeric UID, not `nobody` string — more portable on Alpine)
+- Docker: `USER 65534:65534` (numeric UID, not `nobody` string — more portable on Alpine); Dockerfile must `COPY go.mod go.sum ./` — omitting go.sum causes build failure even after `go mod download`
 - Middleware context helpers (`SetOutcome`, `SetLogError`) are nil-safe — no-op when no state on context; preserves all existing tests unchanged
-- Histogram buckets stored cumulatively in `atomic.Int64` array; rendered directly (no re-accumulation in ServeHTTP)
+- Metrics use `prometheus/client_golang` with a **custom registry** (`prometheus.NewRegistry()`) — never the default, to avoid auto-registering Go runtime metrics
+- Pre-initialize all outcome label values in `New()` so zero counters appear in exposition from the start
 - `Metrics` middleware wraps only `/convert` — health and metrics scrapes must not pollute counters
 - JSON logs go to `os.Stderr`; startup log also JSON via `json.Marshal` + `fmt.Fprintf`

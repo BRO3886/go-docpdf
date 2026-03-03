@@ -9,6 +9,9 @@ docpdf
 # macOS
 .DS_Store
 
+# Marketing (local drafts, not for sharing)
+marketing/
+
 # Editor
 .idea/
 .vscode/
