@@ -1,11 +1,13 @@
 FROM golang:1.24.0-alpine AS builder
 
+ARG TARGETARCH
+
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY cmd/ ./cmd/
 COPY internal/ ./internal/
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o docpdf ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -trimpath -ldflags="-s -w" -o docpdf ./cmd/server
 
 FROM alpine:3.21
 
